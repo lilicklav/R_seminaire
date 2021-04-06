@@ -16,7 +16,7 @@ data_fisc <- read_excel("C:/Users/alave/Downloads/Revenus Fiscaux.xlsx", sheet =
 
 data_csp <- read_excel("C:/Users/alave/Downloads/csp.xlsx", sheet = "DEP")
 
-data_obese <- read_excel("C:/Users/alave/Downloads/Obï¿½sitï¿½.xlsx", sheet = "DEP")
+data_obese <- read_excel("C:/Users/alave/Downloads/Obésité.xlsx", sheet = "DEP")
 
 
 
@@ -83,9 +83,9 @@ colnames(data_csp)[2] <- 'dep_name'
 data_csp <- subset(data_csp, select = -c(dep_name))
 data_csp$`Part des agriculteurs exploitants` <- type.convert(data_csp$`Part des agriculteurs exploitants`, dec = ".")
 data_csp$`Part des artisans, comm., chefs d'entr.` <- type.convert(data_csp$`Part des artisans, comm., chefs d'entr.`, dec = ".")
-data_csp$`Part des cadres, professions intellect. supï¿½rieures` <- type.convert(data_csp$`Part des cadres, professions intellect. supï¿½rieures`, dec = ".")
-data_csp$`Part des professions intermï¿½d.` <- type.convert(data_csp$`Part des professions intermï¿½d.`, dec = ".")
-data_csp$`Part des employï¿½s` <- type.convert(data_csp$`Part des employï¿½s`, dec = ".")
+data_csp$`Part des cadres, professions intellect. supérieures` <- type.convert(data_csp$`Part des cadres, professions intellect. supérieures`, dec = ".")
+data_csp$`Part des professions interméd.` <- type.convert(data_csp$`Part des professions interméd.`, dec = ".")
+data_csp$`Part des employés` <- type.convert(data_csp$`Part des employés`, dec = ".")
 data_csp$`Part des ouvriers` <- type.convert(data_csp$`Part des ouvriers`, dec = ".")
 data_csp$Autres <- type.convert(data_csp$Autres, dec = ".")
 
@@ -142,7 +142,7 @@ data_for_regression <- subset(data_for_regression, select = -c(dep, jour))
 
 
 data_for_regression <- data_for_regression[!is.na(data_for_regression$`tmoy.avril-2020`),]
-data_for_regression <- scale(data_for_regression)
+data_for_regression <- as.data.frame(scale(data_for_regression))
 
 ##############################################################################################################################################
 
