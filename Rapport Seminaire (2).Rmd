@@ -1,0 +1,98 @@
+---
+title: "Rapport Projet Séminaire"
+output: html_document
+---
+# Sommaire
+####  Présentation du sujet
+####  Organisation et répartition du travail au sein du groupe
+####  Choix des variables à intégrer
+####  Régression linéaire
+####  Ridge Régression 
+####  Régression Lasso
+####  Conclusion
+<br/>
+
+
+## Présentation du sujet
+
+Sujet 2 : Modèles de régression et sélection de variables : Existe-t-il un lien entre des facteurs climatiques (température, pluviométrie, ensoleillement, vent,… ) et socio-économiques (revenu fiscal, age, …) et l’évolution du nombre d’hospitalisations (ou réanimations) à l’échelle du département?
+
+<br/>
+
+
+Ce rapport contient les résultats d'analyse de données
+d'hospitalisation et réanimation de la crise du covid sur le plan national et départemental.
+
+
+
+Pour entrer dans le vif du sujet,
+Voici un graphique dynamique représentant le 
+nombre de réanimation pour chaque département.
+
+```{r data, echo=FALSE, message=FALSE,warning=FALSE}
+library(dplyr)
+library(readxl)
+
+# read files
+data_covid <- read.csv("https://www.data.gouv.fr/fr/datasets/r/63352e38-d353-4b54-bfd1-f1b3ee1cabd7", 
+         sep = ";", header = TRUE)
+
+estim_pop_dep_sexe_gca_1975_2021 <- read_excel("C:/Users/allem/Downloads/data_NbHabitants_Dep.xls", sheet = "2021")
+
+# number of peoples estimations -- data manipulation for join
+colnames(estim_pop_dep_sexe_gca_1975_2021)[1] <- 'dep'
+data_population <- subset(estim_pop_dep_sexe_gca_1975_2021, 
+                          select = c(dep, ...8))
+data_population <-data.frame(data_population)
+data_population <- data_population[c(5:nrow(data_population)),]
+colnames(data_population)[2] <- 'nbr_pop'
+
+# join data_covid and data_population on number dep
+data_covid <- subset(data_covid, sexe == 0)
+data <-left_join(data_covid,data_population, by = "dep")
+data["nb_hosp_pop"] <- (data$hosp / as.integer(data$nbr_pop))*100000
+data["nb_rea_pop"] <- (data$rea / as.integer(data$nbr_pop)) * 100000
+```
+
+```{r graph, echo=FALSE,message=FALSE,warning=FALSE}
+library(ggplot2)
+library(plotly)
+library(scales)
+# Reproduce hosp plot and rea plot 
+g=ggplot(data, aes(x = jour, y = nb_rea_pop, group = dep, color=dep))+geom_line() 
+ggplotly(g + labs(title = "Nombre de réanimation pour 100 000 habitants"), tooltip = c("jour","nb_rea_pop","dep"))  
+
+
+```
+
+
+
+##  Organisation et répartition du travail au sein du groupe
+Nous avons réparti le travail au sein du groupe en fonction des intérêts et des compétences de chacun. Nous avons donc eu la répartition des tâches suivante : 
+<br/>
+Massi : Utilisation de R/Python pour le traitement des données pour la partie revenus fiscaux par département + réalisation du modèle ridge
+<br/>
+Thomas : Utilisation de RMarkdown pour présenter les données au format HTML, réalisation du rapport
+<br/>
+Houssem :  Traitement des données pour la partie démographique
+<br/>
+Alick : Utilisation de R/Python pour le traitement des données d’hospitalisation et de réanimation et faire les graphiques et du modèle de  régression linéaire
+<br/>
+Marjorie : Traitement des données pour la partie nombre d’habitants par département + rapport RMarkdown
+<br/>
+Ensemble des membres : Récupération des sources de données externes
+<br/>
+
+##  Choix des variables à intégrer
+Au vu de notre sujet nous avons intégrer 5 principales variables :
+<br/>
+<ul><li>Taux d'obésité</li>
+<li>Revenus fiscaux moyens</li>
+<li>Taux de pauvreté</li>
+<li>Température moyenne</li>
+<li>Catégorie socio-professionelle (répartie en 6 variables : cadres, ouvriers, artisans, autres)</li></ul>
+<br/>
+
+L'objectif est de trouver s'il y a des liens entre ces variables et le nombre d'hospitalisation/réanimation dans le but de pouvoir par la suite prédire l'évolution ces deux nombres.
+
+##  Conclusion 
