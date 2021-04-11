@@ -1,0 +1,731 @@
+---
+title: "Rapport Projet Séminaire"
+output: html_document
+---
+# Sommaire
+####  Présentation du sujet
+####  Organisation et répartition du travail au sein du groupe
+####  Choix des variables à intégrer
+####  Calcul des corrélations
+####  Régression linéaire
+####  Ridge Régression 
+####  Régression Lasso
+####  Prédictions
+####  Conclusion
+<br/>
+
+
+## Présentation du sujet
+
+Sujet 2 : Modèles de régression et sélection de variables : Existe-t-il un lien entre des facteurs climatiques (température, pluviométrie, ensoleillement, vent,… ) et socio-économiques (revenu fiscal, age, …) et l’évolution du nombre d’hospitalisations (ou réanimations) à l’échelle du département?
+
+<br/>
+
+
+Ce rapport contient les résultats d'analyse de données
+d'hospitalisation et réanimation de la crise du covid sur le plan national et départemental.
+
+
+
+Pour entrer dans le vif du sujet,
+voici un graphique dynamique représentant le 
+nombre de réanimation pour chaque département.
+
+```{r data1, echo=FALSE, message=FALSE,warning=FALSE}
+library(dplyr)
+library(readxl)
+library(ggplot2)
+
+# read files
+data_covid <- read.csv("https://www.data.gouv.fr/fr/datasets/r/63352e38-d353-4b54-bfd1-f1b3ee1cabd7", 
+         sep = ";", header = TRUE)
+
+estim_pop_dep_sexe_gca_1975_2021 <- read_excel("C:/Users/alave/Downloads/data_NbHabitants_Dep.xls", sheet = "2021")
+
+data_temp <- read.csv("https://www.data.gouv.fr/fr/datasets/r/dd0df06a-85f2-4621-8b8b-5a3fe195bcd7", sep = ";", header = TRUE)
+
+data_pauvre <- read_excel("C:/Users/alave/Downloads/taux de pauvrete.xlsx", sheet = "DEP")
+
+data_fisc <- read_excel("C:/Users/alave/Downloads/Revenus Fiscaux.xlsx", sheet = "DEP")
+
+data_csp <- read_excel("C:/Users/alave/Downloads/csp.xlsx", sheet = "DEP")
+
+data_obese <- read_excel("C:/Users/alave/Downloads/Obésité.xlsx", sheet = "DEP")
+
+
+
+# number of peoples estimations -- data manipulation for join
+colnames(estim_pop_dep_sexe_gca_1975_2021)[1] <- 'dep'
+data_population <- subset(estim_pop_dep_sexe_gca_1975_2021, 
+                          select = c(dep, ...8, ...3, ...4, ...5, ...6, ...7))
+data_population <-data.frame(data_population)
+data_population <- data_population[c(5:nrow(data_population)),]
+colnames(data_population)[2] <- 'nbr_pop'
+data_population$...3 <- type.convert(data_population$...3, dec = ".")
+data_population$...4 <- type.convert(data_population$...4, dec = ".")
+data_population$...5 <- type.convert(data_population$...5, dec = ".")
+data_population$...6 <- type.convert(data_population$...6, dec = ".")
+data_population$...7 <- type.convert(data_population$...7, dec = ".")
+
+data_population$nbr_pop <- type.convert(data_population$nbr_pop, dec = ".")
+data_population["pourcentage_10_19ans"] <- (data_population$...3/data_population$nbr_pop)*100
+data_population["pourcentage_20_39ans"] <- (data_population$...4/data_population$nbr_pop)*100
+data_population["pourcentage_40_59ans"] <- (data_population$...5/data_population$nbr_pop)*100
+data_population["pourcentage_60_74ans"] <- (data_population$...6/data_population$nbr_pop)*100
+data_population["pourcentage_75_etplus"] <- (data_population$...7/data_population$nbr_pop)*100
+data_population <- subset(data_population, select = -c(...3, ...4, ...5, ...6, ...7 ))
+
+                                        
+# temp data manipulation 
+data_temp <- subset(data_temp, select = c(date_obs, code_insee_departement, tmoy))
+
+# pauvre data manipulation
+colnames(data_pauvre)[1] <- 'dep'
+data_pauvre <- data_pauvre[c(4:nrow(data_pauvre)),]
+data_pauvre <- subset(data_pauvre, select = c(dep, ...3, ...4, ...5, ...6, ...7, ...8, ...9))
+data_pauvre$...3 <- type.convert(data_pauvre$...3, dec = ".")
+data_pauvre$...4 <- type.convert(data_pauvre$...4, dec = ".")
+data_pauvre$...5 <- type.convert(data_pauvre$...5, dec = ".")
+data_pauvre$...6 <- type.convert(data_pauvre$...6, dec = ".")
+data_pauvre$...7 <- type.convert(data_pauvre$...7, dec = ".")
+data_pauvre$...8 <- type.convert(data_pauvre$...8, dec = ".")
+data_pauvre$...9 <- type.convert(data_pauvre$...9, dec = ".")
+colnames(data_pauvre)[2] <- 'taux_pauvrete_moy'
+colnames(data_pauvre)[3] <- 'taux_pauvrete_30etmoins'
+colnames(data_pauvre)[4] <- 'taux_pauvrete_30_39ans'
+colnames(data_pauvre)[5] <- 'taux_pauvrete_40_49ans'
+colnames(data_pauvre)[6] <- 'taux_pauvrete_50_59ans'
+colnames(data_pauvre)[7] <- 'taux_pauvrete_60_74ans'
+colnames(data_pauvre)[8] <- 'taux_pauvrete_75etplus'
+
+# fisc data manipulation
+colnames(data_fisc)[1] <- 'dep'
+colnames(data_fisc)[5] <- 'med_revenu'
+colnames(data_fisc)[4] <- 'pourcentage_menage_imposes'
+data_fisc <- data_fisc[c(2:nrow(data_fisc)),]
+data_fisc <- subset(data_fisc, select = c("dep", "med_revenu", "pourcentage_menage_imposes"))
+data_fisc$med_revenu <- type.convert(data_fisc$med_revenu, dec = ".")
+data_fisc$pourcentage_menage_imposes <- type.convert(data_fisc$pourcentage_menage_imposes, dec = ".")
+
+# csp data manipulation
+data_csp <- data_csp[c(3:nrow(data_csp)),]
+data_csp <- subset(data_csp, select = -c(...2))
+colnames(data_csp)[1] <- 'dep'
+colnames(data_csp)[2] <- 'agriculteurs'
+colnames(data_csp)[3] <- 'artisans'
+colnames(data_csp)[4] <- 'cadres'
+colnames(data_csp)[5] <- 'prof_ind'
+colnames(data_csp)[6] <- 'employes'
+colnames(data_csp)[7] <- 'ouvriers'
+colnames(data_csp)[8] <- 'autres'
+data_csp <- data_csp[-1, ]
+data_csp$agriculteurs <- type.convert(data_csp$agriculteurs, dec = ".")
+data_csp$artisans <- type.convert(data_csp$artisans, dec = ".")
+data_csp$cadres <- type.convert(data_csp$cadres, dec = ".")
+data_csp$prof_ind <- type.convert(data_csp$prof_ind, dec = ".")
+data_csp$employes <- type.convert(data_csp$employes, dec = ".")
+data_csp$ouvriers <- type.convert(data_csp$ouvriers, dec = ".")
+data_csp$autres <- type.convert(data_csp$autres, dec = ".")
+
+# obese data manipulation
+data_obese <- data_obese[c(4:nrow(data_obese)),]
+colnames(data_obese)[1] <- 'dep'
+colnames(data_obese)[3] <- 'frequence_obesite'
+data_obese <- subset(data_obese, select = c("dep", "frequence_obesite"))
+data_obese$frequence_obesite <- type.convert(data_obese$frequence_obesite, dec = ".")
+
+# join data_covid and data_population on number dep
+data_covid <- subset(data_covid, sexe == 0)
+data_population <-left_join(data_covid,data_population, by = "dep")
+data_population["hosp_pop"] <- (data_population$hosp / as.integer(data_population$nbr_pop))*100000
+data_population["rea_pop"] <- (data_population$rea / as.integer(data_population$nbr_pop)) * 100000
+
+################################################################################################ CREATE DATAFRAME FOR REGRESSION
+# INFO: PIC COVID DAY -- HOSP & REA,  NB POPULATION, TEMP APRIL, TAUX PAUVRETE, REVENU_MED
+
+data_for_regression <- subset(data_population, 
+                              select = c(dep, jour, hosp_pop, rea_pop, nbr_pop, pourcentage_10_19ans, pourcentage_20_39ans,
+                                         pourcentage_40_59ans, pourcentage_60_74ans, pourcentage_75_etplus))
+#  SELECT THE DAY                                         
+data_for_regression <- subset(data_for_regression, data_for_regression$jour == "2020-04-15")
+
+data_hosp <- subset(data_population, select = c(dep, jour, hosp_pop))
+data_hosp$jour <- as.Date(data_hosp$jour)
+data_hosp <- subset(data_hosp, data_hosp$jour > as.Date("2020-04-01") & data_hosp$jour < as.Date("2020-04-15"))
+data_hosp<- reshape(data_hosp, direction = "wide", idvar = "dep", timevar = "jour")
+
+data_rea <- subset(data_population, select = c(dep, jour, rea_pop))
+data_rea$jour <- as.Date(data_rea$jour)
+data_rea <- subset(data_rea, data_rea$jour > as.Date("2020-04-01") & data_rea$jour < as.Date("2020-04-15"))
+data_rea<- reshape(data_rea, direction = "wide", idvar = "dep", timevar = "jour")
+
+# SELECT THE TEMPERATURE OF THE MONTH BEFORE  AND THE MONTH OF THE SELECTED DAY
+
+data_temp_for_regression <- data.frame(data_temp$code_insee_departement, data_temp$date_obs,data_temp$tmoy)
+data_temp_for_regression$data_temp.tmoy <- type.convert(data_temp_for_regression$data_temp.tmoy, dec = ".")
+
+colnames(data_temp_for_regression)[1] <- 'dep'
+colnames(data_temp_for_regression)[2] <- 'jour'
+colnames(data_temp_for_regression)[3] <- 'tmoy'
+data_temp_for_regression$jour <- as.Date(data_temp_for_regression$jour)
+data_temp_for_regression <- data_temp_for_regression[!is.na(data_temp_for_regression$tmoy),] 
+data_temp_for_regression["month"] <- format(data_temp_for_regression$jour, '%B-%Y')
+data_temp_for_regression <- data_temp_for_regression[, c("dep", "tmoy", "month")]
+data_temp_for_regression <- subset(data_temp_for_regression, 
+                                   data_temp_for_regression$month == "mars-2020" | data_temp_for_regression$month == "avril-2020")
+
+# PASS THESE MONTH BY COLUMNS
+data_temp_for_regression<- reshape(aggregate(.~dep+month,data_temp_for_regression, mean), 
+                                   direction = "wide", idvar = "dep", timevar = "month")
+
+# JOIN WTH OTHER INFORMATIONS
+data_for_regression <- left_join(data_for_regression, data_pauvre, by = "dep")
+data_for_regression <- left_join(data_for_regression, data_fisc, by = "dep")
+data_for_regression <- left_join(data_for_regression, data_obese, by = "dep")
+data_for_regression <- left_join(data_for_regression, data_csp, by = "dep")
+data_for_regression <- left_join(data_for_regression, data_temp_for_regression, by = "dep")
+data_for_regression <- left_join(data_for_regression, data_hosp, by = "dep")
+data_for_regression <- left_join(data_for_regression, data_rea, by = "dep")
+
+
+#Retrieve dep & jour columns
+data_for_regression <- subset(data_for_regression, select = -c(dep, jour))
+
+
+data_for_regression <- data_for_regression[!is.na(data_for_regression$`tmoy.avril-2020`),]
+data_for_regression[] <- lapply(data_for_regression, function(x) type.convert(as.numeric(x)))
+data_for_regression <- as.data.frame(scale(data_for_regression))
+
+##############################################################################################################################################
+
+##########################################################   REGRESSION LINEAIRE   ###########################################################
+
+##############################################################################################################################################
+```
+
+```{r graph, echo=FALSE,message=FALSE,warning=FALSE}
+library(ggplot2)
+library(plotly)
+library(scales)
+
+g_hosp=ggplot(data_population, aes(x = jour, y = hosp_pop, group = dep, color=dep))+geom_line() 
+ggplotly(g_hosp + labs(title = "Nombre de hospitalisations pour 100 000 habitants"), tooltip = c("jour","hosp_pop","dep"))  
+
+# Reproduce hosp plot and rea plot 
+g=ggplot(data_population, aes(x = jour, y = rea_pop, group = dep, color=dep))+geom_line() 
+ggplotly(g + labs(title = "Nombre de réanimations pour 100 000 habitants"), tooltip = c("jour","rea_pop","dep"))  
+
+```
+
+
+
+##  Organisation et répartition du travail au sein du groupe
+Nous avons réparti le travail au sein du groupe en fonction des intérêts et des compétences de chacun. Nous avons donc eu la répartition des tâches suivante : 
+<br/>
+Massi : Utilisation de R/Python pour le traitement des données pour la partie revenus fiscaux par département + réalisation du modèle ridge
+<br/>
+Thomas : Utilisation de RMarkdown pour présenter les données au format HTML, réalisation du rapport
+<br/>
+Houssem :  Traitement des données pour la partie démographique
+<br/>
+Alick : Utilisation de R/Python pour le traitement des données d’hospitalisation et de réanimation et faire les graphiques et du modèle de  régression linéaire
+<br/>
+Marjorie : Traitement des données pour la partie nombre d’habitants par département + rapport RMarkdown
+<br/>
+Ensemble des membres : Récupération des sources de données externes
+<br/>
+
+##  Choix des variables à intégrer
+Au vu de notre sujet nous avons intégrer 5 principales variables :
+<br/>
+<ul><li>Taux d'obésité</li>
+<li>la repartition par tranche d'age de la population</li>
+<li>Revenus fiscaux moyens</li>
+<li>Taux de pauvreté (répartie par tranche d'âge)</li>
+<li>Température moyenne</li>
+<li>Catégorie socio-professionelle (répartie en 7 variables : agriculteurs, professions intermédiaires, employés, cadres, ouvriers, artisans, autres)</li></ul>
+
+L'objectif est de trouver s'il y a des liens entre ces variables et le nombre d'hospitalisation/réanimation dans le but de pouvoir par la suite prédire l'évolution ces deux nombres.
+
+Pour cela nous avons d'abord étudié les corrélations de chaque variables avec les variables nombre d'hospitalisés et nombre de réanimation.
+
+##  Calcul des corrélations
+```{r correlation, echo=FALSE, message=FALSE,warning=FALSE}
+library(corrplot)
+
+data_agri <- data_for_regression[, c(1,2,9)]
+corelation_pauvrete=cor(data_agri, use ="complete.obs")
+corelation_pauvrete
+
+data_agri <- data_for_regression[, c(1,2,16)]
+corelation_revenu=cor(data_agri, use ="complete.obs")
+corelation_revenu
+
+data_agri <- data_for_regression[, c(1,2,17)]
+corelation_impot=cor(data_agri, use ="complete.obs")
+corelation_impot
+
+data_agri <- data_for_regression[, c(1,2,18)]
+corelation_obese=cor(data_agri, use ="complete.obs")
+corelation_obese
+
+data_agri <- data_for_regression[, c(1,2,19)]
+corelation_agri=cor(data_agri, use ="complete.obs")
+corelation_agri
+
+data_agri <- data_for_regression[, c(1,2,20)]
+corelation_artisan=cor(data_agri, use ="complete.obs")
+corelation_artisan
+
+data_agri <- data_for_regression[, c(1,2,21)]
+corelation_cadre=cor(data_agri, use ="complete.obs")
+corelation_cadre
+
+data_agri <- data_for_regression[, c(1,2,22)]
+corelation_profint=cor(data_agri, use ="complete.obs")
+corelation_profint
+
+data_agri <- data_for_regression[, c(1,2,23)]
+corelation_employe=cor(data_agri, use ="complete.obs")
+corelation_employe
+
+data_agri <- data_for_regression[, c(1,2,24)]
+corelation_ouvrier=cor(data_agri, use ="complete.obs")
+corelation_ouvrier
+
+data_agri <- data_for_regression[, c(1,2,25)]
+corelation_autre=cor(data_agri, use ="complete.obs")
+corelation_autre
+
+data_agri <- data_for_regression[, c(1,2,26)]
+corelation_tempAvril=cor(data_agri, use ="complete.obs")
+corelation_tempAvril
+
+data_agri <- data_for_regression[, c(1,2,27)]
+corelation_tempMars=cor(data_agri, use ="complete.obs")
+corelation_tempMars
+```
+Nous pouvons remarquer que les corrélations entre les variables nombres à l'hôpital et en réanimation avec les variables taux de pauvreté moyen, taux d'obésité, températures moyennes au mois d'avril  ne sont pas bonnes (corrélations très faibles).
+
+Nous trouvons des variables qui semblent plutôt être corrélées avec le nombre de personnes hospitalisées et en réanimation : 
+<br/>
+Les personnes ayant une catégorie socio professionnelle de profession intermédiaire et d'ouvrier
+<br/>
+Les personnes ayant une catégorie socio professionnelle d'employés et d'ouvriers, la corrélation est d'ailleurs négative
+<br/>
+La variable sur les températures moyennes de mars semble aussi être corrélée négativement 
+<br/>
+<br/>
+Les variables qui semblent être correctement corrélées avec le nombre de personnes hospitalisées et en réanimation sont: 
+<br/>
+Le revenu médian, le pourcentage des ménages imposés et les personnes appartenant à la catégorie socio professionnelles 'Cadres et profession intellectuelle supérieure'
+<br/>
+Certaines variables sont corrélées négativement : les personnes appartenant à la catégorie socio professionnelles Agriculteurs, Artisans
+
+
+##  Régression linéaire
+
+Afin de confirmer (ou non) les corrélations trouvées nous allons maintenant faire une régression linéaire du nombre d'hospitalisés au pic de cas du premier confinement à savoir le 15/04/2020 sur l'ensemble des variables étudiées. Notre but est de savoir quelles variables a un impact sur le taux d'hospitalisation.
+
+```{r regression, echo=FALSE, message=FALSE,warning=FALSE}
+modele_all <- lm(data_for_regression$hosp_pop ~., data = data_for_regression)
+sm <- summary(modele_all)
+sm
+
+index = sample(1:nrow(data_for_regression), 0.7*nrow(data_for_regression))
+
+train = data_for_regression[index,] # Create the training data
+
+test = data_for_regression[-index,] # Create the test data
+
+
+eval_metrics = function(model, df, predictions, target){
+    resids = df[,target] - predictions
+    resids2 = resids**2
+    N = length(predictions)
+    r2 = summary(model)$r.squared
+    adj_r2 = summary(model)$adj.r.squared
+    adj_r2 #Adjusted R-squared
+    rmse = sqrt(sum(resids2)/N)#RMSE
+    
+    data.frame(
+      RMSE = rmse,
+      Rsquare = adj_r2
+  )
+    
+}
+
+modele_all_pred <- lm(hosp_pop ~., data = train)
+
+predictions_hosp_train = predict(modele_all_pred, newdata = train)
+results_lm_hosp_train <- eval_metrics(modele_all_pred, train, predictions_hosp_train, target = 'hosp_pop')
+
+predictions_hosp_test = predict(modele_all_pred, newdata = test)
+results_lm_hosp_test <- eval_metrics(modele_all_pred, test, predictions_hosp_test, target = 'hosp_pop')
+
+modele_all_pred_rea <- lm(rea_pop ~., data = train)
+
+predictions_rea_train = predict(modele_all_pred_rea, newdata = train)
+results_lm_rea_train <- eval_metrics(modele_all_pred_rea, train, predictions_rea_train, target = 'rea_pop')
+
+predictions_rea_test = predict(modele_all_pred_rea, newdata = test)
+results_lm_rea_test <- eval_metrics(modele_all_pred_rea, test, predictions_rea_test, target = 'rea_pop')
+
+```
+Nous remarquons tout d'abord que le modele est bon. En effet, la valeur du R-squared nous indique que les variables choisies expliquent bien le nombre d'hospitalisations du 15/04/2020.<br/>
+
+De plus, la variable nombre en réanimation et la variable nombre d'hospitalisation du 14/04/2020 ont des coefficients très inférieures à 0.05, on peut donc faciltement en déduire qu'elles ont un impact importants sur notre nombre d'hospitalisations du pic (ce qui est cohérent). <br/>
+Nous ajoutons à cela des valeurs plutot accceptables pour les variables : pourcentage des 40 à 59 ans, taux de pauvrete des 60 à 74 ans, les températures moyennes du mois précédent et du mois en cours. <br/>
+<br/><br/>
+
+### Selection de variables pour l'explication du nombre d'hospitalisation
+
+Nous utilisons un stepAIC qui va tester toutes les combinaisons de variables afin de sélectionner le meilleur modèle. On testera les résultats ensuite. 
+```{r step, echo=FALSE, message=FALSE,warning=FALSE}
+
+library(MASS)
+step <- stepAIC(modele_all, direction = "both", trace = FALSE)
+step
+
+modele_after_step <- lm(formula = data_for_regression$hosp_pop ~ rea_pop + nbr_pop + 
+     pourcentage_10_19ans + pourcentage_40_59ans + taux_pauvrete_moy + 
+     taux_pauvrete_30etmoins + taux_pauvrete_30_39ans + taux_pauvrete_50_59ans + 
+     taux_pauvrete_60_74ans + taux_pauvrete_75etplus + frequence_obesite + 
+     artisans + prof_ind + employes + ouvriers + `tmoy.avril-2020` + 
+     `tmoy.mars-2020` + `hosp_pop.2020-04-05` + `hosp_pop.2020-04-07` + 
+     `hosp_pop.2020-04-09` + `hosp_pop.2020-04-10` + `hosp_pop.2020-04-14` + 
+     `rea_pop.2020-04-04` + `rea_pop.2020-04-05` + `rea_pop.2020-04-12` + 
+     `rea_pop.2020-04-13` + `hosp_pop.2020-04-06`, data = data_for_regression)
+sm_step <- summary(modele_after_step)
+sm_step
+
+```
+On remarque donc effectivement que ce modèle fonctionne très bien avec un R-squared très proche voire supérieur au modele contenant toutes les variables.<br/>
+On peut donc en déduire une sélection de nos variables pour l'explication du nombre d'hospitalisations avec la regression linéaire.
+<br/><br/>Nous décidons d'effectuer également une selection de variable  pour expliquer le nombre de reanimations.
+
+### Selection de variables pour l'explication du nombre de réanimations
+
+```{r steprea, echo=FALSE, message=FALSE,warning=FALSE}
+modele_rea <- lm(data_for_regression$rea_pop ~., data = data_for_regression)
+step_rea <- stepAIC(modele_rea, direction = "both", trace = FALSE)
+step_rea
+
+modele_after_step_rea <- lm(formula = data_for_regression$rea_pop ~ hosp_pop + pourcentage_10_19ans + 
+     taux_pauvrete_moy + taux_pauvrete_30etmoins + taux_pauvrete_60_74ans + 
+    employes + ouvriers + `hosp_pop.2020-04-03` + `hosp_pop.2020-04-07` + 
+     `hosp_pop.2020-04-08` + `hosp_pop.2020-04-12` + `hosp_pop.2020-04-14` + 
+     `rea_pop.2020-04-02` + `rea_pop.2020-04-03` + `rea_pop.2020-04-06` + 
+    `rea_pop.2020-04-10` + `rea_pop.2020-04-14` + `hosp_pop.2020-04-13` + 
+    autres, data = data_for_regression)
+sm_step_rea <- summary(modele_after_step_rea)
+sm_step_rea
+```
+On remarque donc effectivement que ce modèle aussi fonctionne très bien avec un R-squared très proche voire supérieur au modele contenant toutes les variables.<br/> 
+Plus particulièrement, le nombre d'hospitalisations 8 jours avant le nombre de reanimations du 15/04 impact plus le modèle que les autres variables. <br/>
+Nous utilisons maintenant à la ridge regression. <br/>
+
+##  Ridge Régression 
+
+### Explications du taux d'hospitalisations 
+
+On commence d'abord par observer les coefficients de nos variables en fonction des log lambdas: 
+```{r ridgehosp, echo=FALSE, message=FALSE,warning=FALSE}
+library(glmnet)
+
+x_hosp = as.matrix(subset(data_for_regression, select = -c(hosp_pop)))
+y_train_hosp = data_for_regression$hosp_pop
+
+lambdas <- 10^seq(2, -3, by = -.1)
+ridge2 <-  glmnet(x_hosp, y_train_hosp, alpha = 0, lambda = lambdas, family = 'gaussian', standardize = FALSE)
+plot(ridge2, xvar = "lambda")
+```
+
+On selectionne maintenant le lambda optimal:
+
+```{r lambdaopthosp, echo=FALSE, message=FALSE,warning=FALSE}
+
+# Cherche optimal lambdas
+
+cv_ridge_hosp <- cv.glmnet(x_hosp, y_train_hosp, alpha = 0, lambda = lambdas)
+optimal_lambda_hosp <- cv_ridge_hosp$lambda.min
+optimal_lambda_hosp
+```
+
+On observe les coefficients de chaque variable avec ce lambda. <br/> Plus un coefficient est éloignée de 0 et plus il a un impact sur le modèle. 
+
+```{r ridgereghosp, echo=FALSE, message=FALSE,warning=FALSE}
+ridge_reg_hosp = glmnet(x_hosp, y_train_hosp, alpha = 0, family = 'gaussian', lambda = optimal_lambda_hosp)
+
+ridge_reg_hosp$beta
+```
+
+####  Prediction du nombre d'hospitalisations du 15/04
+
+```{r predictionhosp, echo=FALSE, message=FALSE,warning=FALSE}
+
+index = sample(1:nrow(data_for_regression), 0.7*nrow(data_for_regression))
+
+train = data_for_regression[index,] # Create the training data
+x_train_hosp <- as.matrix(subset(train, select = -c(hosp_pop)))
+y_train_pred_hosp <- train$hosp_pop
+
+test = data_for_regression[-index,] # Create the test data
+x_test_hosp <- as.matrix(subset(test, select = -c(hosp_pop)))
+y_test_hosp <- test$hosp_pop
+
+ridge_reg_hosp_pred <- glmnet(x_train_hosp, y_train_pred_hosp, alpha = 0, family = 'gaussian', lambda = optimal_lambda_hosp)
+
+eval_results <- function(true, predicted, df) {
+  SSE <- sum((predicted - true)^2)
+  SST <- sum((true - mean(true))^2)
+  R_square <- 1 - SSE / SST
+  RMSE = sqrt(SSE/nrow(df))
+  # Model performance metrics
+  data.frame(
+    RMSE = RMSE,
+    Rsquare = R_square
+  )
+}
+```
+Prediction Train :
+```{r predictionTrainhosp, echo=FALSE, message=FALSE,warning=FALSE}
+
+# Prediction and evaluation on train data
+predictions_train_hosp <- predict(ridge_reg_hosp_pred, s = optimal_lambda_hosp, newx = x_train_hosp)
+results_hosp_ridge_train <- eval_results(y_train_pred_hosp, predictions_train_hosp, train)
+results_hosp_ridge_train
+```
+Prediction Test :
+```{r predictionTesthosp, echo=FALSE, message=FALSE,warning=FALSE}
+
+# Prediction and evaluation on test data
+predictions_test_hosp <- predict(ridge_reg_hosp_pred, s = optimal_lambda_hosp, newx = x_test_hosp)
+results_hosp_ridge_test <- eval_results(y_test_hosp, predictions_test_hosp, test)
+results_hosp_ridge_test
+```
+On remarque que les résultats de la prédiction sont bons. 
+On arrive donc à prédire le pic d'hospitalisation du premier confinement par les variables que nous avons sélectionnés. 
+
+### Explications du taux de reanimations
+
+On commence d'abord par observer les coefficients de nos variables en fonction des log lambdas: 
+
+```{r ridgeregression, echo=FALSE, message=FALSE,warning=FALSE}
+
+library(glmnet)
+
+x = as.matrix(subset(data_for_regression, select = -c(rea_pop)))
+y_train = data_for_regression$rea_pop
+
+lambdas <- 10^seq(2, -3, by = -.1)
+ridge_rea <-  glmnet(x, y_train, alpha = 0, lambda = lambdas, family = 'gaussian', standardize = FALSE)
+plot(ridge_rea, xvar = "lambda")
+```
+
+On selectionne maintenant le lambda optimal:
+
+```{r lambdaopt, echo=FALSE, message=FALSE,warning=FALSE}
+
+# Cherche optimal lambdas
+
+cv_ridge <- cv.glmnet(x, y_train, alpha = 0, lambda = lambdas)
+optimal_lambda <- cv_ridge$lambda.min
+optimal_lambda
+```
+
+On obtient un lambda optimal. On peut l'observer sur le graphique avec log(0.001) = -3.<br/>
+Les coefficients de chaque variable sont étudiés avec ce lambda. <br/> Plus un coefficient est éloignée de 0 et plus il a un impact sur le modèle. 
+
+```{r ridgereg, echo=FALSE, message=FALSE,warning=FALSE}
+ridge_reg = glmnet(x, y_train, alpha = 0, family = 'gaussian', lambda = optimal_lambda)
+
+ridge_reg$beta
+```
+
+####  Prediction du nombre de reanimations du 15/04
+
+```{r predictionrea, echo=FALSE, message=FALSE,warning=FALSE}
+
+x_train_rea <- as.matrix(subset(train, select = -c(rea_pop)))
+y_train_pred_rea <- train$rea_pop
+
+x_test_rea <- as.matrix(subset(test, select = -c(rea_pop)))
+y_test_rea <- test$rea_pop
+
+
+ridge_reg_rea_pred <- glmnet(x_train_rea, y_train_pred_rea, alpha = 0, family = 'gaussian', lambda = optimal_lambda)
+
+eval_results <- function(true, predicted, df) {
+  SSE <- sum((predicted - true)^2)
+  SST <- sum((true - mean(true))^2)
+  R_square <- 1 - SSE / SST
+  RMSE = sqrt(SSE/nrow(df))
+  # Model performance metrics
+  data.frame(
+    RMSE = RMSE,
+    Rsquare = R_square
+  )
+}
+```
+
+Prediction Train :
+
+```{r predictionTrainrea, echo=FALSE, message=FALSE,warning=FALSE}
+
+# Prediction and evaluation on train data
+predictions_train_rea <- predict(ridge_reg_rea_pred, s = optimal_lambda, newx = x_train_rea)
+results_rea_ridge_train <- eval_results(y_train_pred_rea, predictions_train_rea, train)
+results_rea_ridge_train
+```
+
+Prediction Test :
+
+```{r predictionTestrea, echo=FALSE, message=FALSE,warning=FALSE}
+
+# Prediction and evaluation on test data
+predictions_test_rea <- predict(ridge_reg_rea_pred, s = optimal_lambda, newx = x_test_rea)
+results_rea_ridge_test <- eval_results(y_test_rea, predictions_test_rea, test)
+results_rea_ridge_test
+```
+
+##  Régression Lasso
+
+### Explication du nombre d'hospitalisation
+
+Nous affichons le lambda optimal pour cette regression et nous observons les coefficients associés aux variables:
+
+```{r regressionlassohosp, echo=FALSE, message=FALSE,warning=FALSE}
+
+cv_lasso_hosp <- cv.glmnet(x_hosp, y_train_hosp, alpha = 1, lambda = lambdas)
+optimal_lambda_lasso_hosp <- cv_lasso_hosp$lambda.min
+optimal_lambda_lasso_hosp
+
+lasso_reg <- glmnet(x_hosp, y_train_hosp, alpha = 1, standardize = FALSE, lambda = optimal_lambda_lasso_hosp)
+lasso_reg$beta
+```
+
+##  Prediction du nombre d'hospitalisation du pic du 15/04
+
+```{r predictionlassohosp, echo=FALSE, message=FALSE,warning=FALSE}
+
+lasso_reg_hosp_pred <- glmnet(x_train_hosp, y_train_pred_hosp, alpha = 1, standardize = FALSE, lambda = optimal_lambda_lasso_hosp)
+
+eval_results <- function(true, predicted, df) {
+  SSE <- sum((predicted - true)^2)
+  SST <- sum((true - mean(true))^2)
+  R_square <- 1 - SSE / SST
+  RMSE = sqrt(SSE/nrow(df))
+  # Model performance metrics
+  data.frame(
+    RMSE = RMSE,
+    Rsquare = R_square
+  )
+}
+
+```
+Prediction Train :
+```{r predictionlassoTrainhosp, echo=FALSE, message=FALSE,warning=FALSE}
+
+# Prediction and evaluation on train data
+predictions_lasso_hosp <- predict(lasso_reg_hosp_pred, s = optimal_lambda_lasso_hosp, newx = x_train_hosp)
+results_hosp_lasso_train <- eval_results(y_train_pred_hosp, predictions_lasso_hosp, train)
+results_hosp_lasso_train
+```
+Prediction Test :
+```{r predictionlassoTesthosp, echo=FALSE, message=FALSE,warning=FALSE}
+
+# Prediction and evaluation on test data
+predictions_test_lasso_hosp <- predict(lasso_reg_hosp_pred, s = optimal_lambda_lasso_hosp, newx = x_test_hosp)
+results_hosp_lasso_test <- eval_results(y_test_hosp, predictions_test_lasso_hosp, test)
+results_hosp_lasso_test
+```
+
+### Explication du nombre de reanimation
+
+Nous affichons le lambda optimal pour cette regression et nous observons les coefficients associés aux variables:
+
+```{r regressionlassorea, echo=FALSE, message=FALSE,warning=FALSE}
+
+cv_lasso_rea <- cv.glmnet(x_hosp, y_train, alpha = 1, lambda = lambdas)
+optimal_lambda_lasso_rea <- cv_lasso_rea$lambda.min
+optimal_lambda_lasso_rea
+
+lasso_reg_rea <- glmnet(x, y_train, alpha = 1, standardize = FALSE, lambda = optimal_lambda_lasso_rea)
+lasso_reg_rea$beta
+```
+
+##  Prediction du nombre de reanimations du pic du 15/04
+
+```{r predictionlassorea, echo=FALSE, message=FALSE,warning=FALSE}
+
+lasso_reg_rea_pred <- glmnet(x_train_rea, y_train_pred_rea, alpha = 1, standardize = FALSE, lambda = optimal_lambda_lasso_rea)
+
+eval_results <- function(true, predicted, df) {
+  SSE <- sum((predicted - true)^2)
+  SST <- sum((true - mean(true))^2)
+  R_square <- 1 - SSE / SST
+  RMSE = sqrt(SSE/nrow(df))
+  # Model performance metrics
+  data.frame(
+    RMSE = RMSE,
+    Rsquare = R_square
+  )
+}
+```
+Prediction Train :
+```{r predictionlassoTrainrea, echo=FALSE, message=FALSE,warning=FALSE}
+
+# Prediction and evaluation on train data
+predictions_lasso_rea <- predict(lasso_reg_rea_pred, s = optimal_lambda_lasso_rea, newx = x_train_rea)
+results_rea_lasso_train <- eval_results(y_train_pred_rea, predictions_lasso_rea, train)
+results_rea_lasso_train
+```
+Prediction Test :
+```{r predictionlassoTestrea, echo=FALSE, message=FALSE,warning=FALSE}
+
+# Prediction and evaluation on test data
+predictions_test_lasso_rea <- predict(lasso_reg_rea_pred, s = optimal_lambda_lasso_rea, newx = x_test_rea)
+results_rea_lasso_test <- eval_results(y_test_rea, predictions_test_lasso_rea, test)
+results_rea_lasso_test
+```
+
+
+##  Conclusion 
+
+### Nombre d'hospitalisations
+
+Avant de conclure sur la selection de variables explicatives, on remarque d'abord que les modèles que nous avons effectuées ont bien fonctionnés. Ce qui signifie que nos variables expliquent bien le nombre d'hospitalisation.
+
+```{r conclusionresulthosp, echo=FALSE, message=FALSE,warning=FALSE}
+
+results_rmse_train <- c(results_hosp_ridge_train$RMSE, results_hosp_lasso_train$RMSE, results_lm_hosp_train$RMSE)
+results_rmse_test <- c(results_hosp_ridge_test$RMSE, results_hosp_lasso_test$RMSE, results_lm_hosp_test$RMSE)
+results_rsquare_train <- c(results_hosp_ridge_train$Rsquare, results_hosp_lasso_train$Rsquare, results_lm_hosp_train$Rsquare)
+results_rsquare_test <- c(results_hosp_ridge_test$Rsquare, results_hosp_lasso_test$Rsquare, results_lm_hosp_test$Rsquare)
+ 
+
+list_results <- list(results_rmse_train, results_rsquare_train, results_rmse_test, results_rsquare_test)
+result <- data.frame(list_results)
+colnames(result) <- c("RMSE train","Rsquare Train","RMSE test", "Rsquare test")
+rownames(result) <- c("ridge","lasso", "Reg lineaire")
+result
+```
+
+### Nombre de reanimations
+
+De même pour la réanimation du pic du covid, les modèles que nous avons effectuées ont bien fonctionnés. Ce qui signifie que nos variables expliquent bien le nombre de reanimations. 
+
+```{r conclusionresultrea, echo=FALSE, message=FALSE,warning=FALSE}
+results_rmse_train_rea <- c(results_rea_ridge_train$RMSE, results_rea_lasso_train$RMSE, results_lm_rea_train$RMSE)
+results_rmse_test_rea <- c(results_rea_ridge_test$RMSE, results_rea_lasso_test$RMSE, results_lm_rea_test$RMSE)
+results_rsquare_train_rea <- c(results_rea_ridge_train$Rsquare, results_rea_lasso_train$Rsquare, results_lm_rea_train$Rsquare)
+results_rsquare_test_rea <- c(results_rea_ridge_test$Rsquare, results_rea_lasso_test$Rsquare, results_lm_rea_test$Rsquare)
+ 
+
+list_results_rea <- list(results_rmse_train_rea, results_rsquare_train_rea, results_rmse_test_rea, results_rsquare_test_rea)
+result_rea <- data.frame(list_results_rea)
+colnames(result_rea) <- c("RMSE train","Rsquare Train","RMSE test", "Rsquare test")
+rownames(result_rea) <- c("ridge","lasso", "Reg lineaire")
+result_rea
+```

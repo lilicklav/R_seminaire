@@ -273,7 +273,8 @@ eval_results <- function(true, predicted, df) {
 }
 
 # Prediction and evaluation on train data
-predictions_train <- predict(ridge_reg_for_regression, s = optimal_lambda, newx = x_train)
+pred
+ictions_train <- predict(ridge_reg_for_regression, s = optimal_lambda, newx = x_train)
 eval_results(y_train2, predictions_train, train)
 
 # Prediction and evaluation on test data
