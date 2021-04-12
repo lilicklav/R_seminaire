@@ -200,7 +200,7 @@ optimal_lambda
 ridge_reg = glmnet(x, y_train, alpha = 0, family = 'gaussian', lambda = optimal_lambda)
 
 ridge_reg$beta
-x = summary(ridge_reg$beta)
+x_sum = summary(ridge_reg$beta)
 names = rownames(ridge_reg$beta)
 data_ridge = as.data.frame(x$x,names)
 colnames(data_ridge)[1] <- 'coef'
@@ -215,9 +215,10 @@ lasso_reg <- glmnet(x, y_train, alpha = 1, standardize = FALSE, lambda = optimal
 lasso_reg$beta
 
 x_lasso = summary(lasso_reg$beta)
-#names_lasso = rownames(lasso_reg$beta)
+names_lasso = rownames(lasso_reg$beta)
 i = 1
 names_list_lasso = list()
+
 for (elt in x_lasso$i){
   names_lasso[elt] -> names_list_lasso[i]
   i = i + 1 
@@ -226,6 +227,27 @@ for (elt in x_lasso$i){
 data_lasso = as.data.frame(x_lasso$x,unlist(names_list_lasso))
 colnames(data_lasso)[1] <- 'coef'
 
+library(tidyverse)
+library(caret)
+library(glmnet)
+
+elastic <- train(x, y_train, method = "glmnet",trControl = trainControl("cv", number = 10),tuneLength = 10)
+summary_elastic <- summary(coef(elastic$finalModel, elastic$bestTune$lambda))
+names_elastic = rownames(coef(elastic$finalModel, elastic$bestTune$lambda))
+
+i = 1
+names_list_elastic = list()
+
+for (elt in summary_elastic$i){
+  names_elastic[elt] -> names_list_elastic[i]
+  i = i + 1 
+}
+data_elastic = as.data.frame(x_lasso$x,unlist(names_list_lasso))
+colnames(data_elastic)[1] <- 'coef'
+
+
+# Model coefficients
+coef(elastic$finalModel, elastic$bestTune$lambda)
 
 ###############################################################################################################################################
 

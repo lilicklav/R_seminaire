@@ -1,5 +1,6 @@
 ---
-title: "Rapport Projet Séminaire"
+title: "Modele de régression et sélection de variables"
+subtitle: "Existe-til un lien entre facteurs climatiques et socio-économiques et l'évolution du nombre d'hospitalisations ?"
 author: 
   - ALLEMANE Marjorie 
   - AMY Houssem 
@@ -7,11 +8,11 @@ author:
   - PEDECHES Thomas 
   - LAVENAIRE Alick
 date: "`r format(Sys.time(), '%d. %B, %Y')`"
-subtitle: "TABLE DES MATIERES"
 output: 
   html_document: 
     toc: true
     toc_depth: 4
+toc-title: "TABLE DES MATIERES"
 ---
 
 #  Organisation et répartition du travail au sein du groupe
@@ -325,6 +326,9 @@ Certaines variables sont corrélées négativement : les personnes appartenant �
 
 Afin de confirmer (ou non) les corrélations trouvées nous allons maintenant faire une régression linéaire du nombre d'hospitalisés au pic de cas du premier confinement à savoir le 15/04/2020 sur l'ensemble des variables étudiées. Notre but est de savoir quelles variables a un impact sur le taux d'hospitalisation.
 
+## Explication du nombre d'hospitalisation
+
+
 ```{r regression, echo=FALSE, message=FALSE,warning=FALSE}
 modele_all <- lm(data_for_regression$hosp_pop ~., data = data_for_regression)
 sm <- summary(modele_all)
@@ -376,7 +380,7 @@ De plus, la variable nombre en réanimation et la variable nombre d'hospitalisat
 Nous ajoutons à cela des valeurs plutot accceptables pour les variables : pourcentage des 40 à 59 ans, taux de pauvrete des 60 à 74 ans, les températures moyennes du mois précédent et du mois en cours. <br/>
 <br/><br/>
 
-## Selection de variables pour l'explication du nombre d'hospitalisation
+### Selection de modele pour l'explication du nombre d'hospitalisation 
 
 Nous utilisons un stepAIC qui va tester toutes les combinaisons de variables afin de sélectionner le meilleur modèle. On testera les résultats ensuite. 
 ```{r step, echo=FALSE, message=FALSE,warning=FALSE}
@@ -402,16 +406,19 @@ On remarque donc effectivement que ce modèle fonctionne très bien avec un R-sq
 On peut donc en déduire une sélection de nos variables pour l'explication du nombre d'hospitalisations avec la regression linéaire.
 <br/><br/>Nous décidons d'effectuer également une selection de variable  pour expliquer le nombre de reanimations.
 
-## Selection de variables pour l'explication du nombre de réanimations
+## Explication du nombre de réanimations
 
-```{r steprea, echo=FALSE, message=FALSE,warning=FALSE}
+```{r modelelinrea, echo=FALSE, message=FALSE,warning=FALSE}
 modele_rea <- lm(data_for_regression$rea_pop ~., data = data_for_regression)
 sm_rea <- summary(modele_rea)
 sm_rea
 
 step_rea <- stepAIC(modele_rea, direction = "both", trace = FALSE)
-step_rea
+```
 
+### Selection de modele pour l'explication du nombre de réanimations
+
+```{r steprea, echo=FALSE, message=FALSE,warning=FALSE}
 modele_after_step_rea <- lm(formula = data_for_regression$rea_pop ~ hosp_pop + pourcentage_10_19ans + 
      taux_pauvrete_moy + taux_pauvrete_30etmoins + taux_pauvrete_60_74ans + 
     employes + ouvriers + `hosp_pop.2020-04-03` + `hosp_pop.2020-04-07` + 
@@ -423,7 +430,7 @@ sm_step_rea <- summary(modele_after_step_rea)
 sm_step_rea
 ```
 On remarque donc effectivement que ce modèle aussi fonctionne très bien avec un R-squared très proche voire supérieur au modele contenant toutes les variables.<br/> 
-Plus particulièrement, le nombre d'hospitalisations 8 jours avant le nombre de reanimations du 15/04 impact plus le modèle que les autres variables. <br/>
+
 Nous utilisons maintenant à la ridge regression. <br/>
 
 # Ridge Régression 
@@ -855,19 +862,19 @@ data_ridge_rea
 
 ```{r conclusionselectionrealasso, echo=FALSE, message=FALSE,warning=FALSE}
 
-summary_lasso_hosp = summary(lasso_reg$beta)
-names_lasso = rownames(lasso_reg$beta)
+summary_lasso_rea = summary(lasso_reg_rea$beta)
+names_lasso = rownames(lasso_reg_rea$beta)
 
 i = 1
 names_list_lasso = list()
-for (elt in summary_lasso_hosp$i){
+for (elt in summary_lasso_rea$i){
   names_lasso[elt] -> names_list_lasso[i]
   i = i + 1 
 }
  
-data_lasso_hosp = as.data.frame(x=summary_lasso_hosp$x,unlist(names_list_lasso))
-colnames(data_lasso_hosp)[1] <- 'coef'
-data_lasso_hosp
+data_lasso_rea = as.data.frame(x=summary_lasso_rea$x,unlist(names_list_lasso))
+colnames(data_lasso_rea)[1] <- 'coef'
+data_lasso_rea
 
 ```
 
