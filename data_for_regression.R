@@ -75,19 +75,23 @@ data_fisc$pourcentage_menage_imposes <- type.convert(data_fisc$pourcentage_menag
 
 # csp data manipulation
 data_csp <- data_csp[c(3:nrow(data_csp)),]
-names(data_csp) <- as.matrix(data_csp[1, ])
-data_csp <- data_csp[-1, ]
-data_csp[] <- lapply(data_csp, function(x) type.convert(as.character(x)))
+data_csp <- subset(data_csp, select = -c(...2))
 colnames(data_csp)[1] <- 'dep'
-colnames(data_csp)[2] <- 'dep_name'
-data_csp <- subset(data_csp, select = -c(dep_name))
-data_csp$`Part des agriculteurs exploitants` <- type.convert(data_csp$`Part des agriculteurs exploitants`, dec = ".")
-data_csp$`Part des artisans, comm., chefs d'entr.` <- type.convert(data_csp$`Part des artisans, comm., chefs d'entr.`, dec = ".")
-data_csp$`Part des cadres, professions intellect. supérieures` <- type.convert(data_csp$`Part des cadres, professions intellect. supérieures`, dec = ".")
-data_csp$`Part des professions interméd.` <- type.convert(data_csp$`Part des professions interméd.`, dec = ".")
-data_csp$`Part des employés` <- type.convert(data_csp$`Part des employés`, dec = ".")
-data_csp$`Part des ouvriers` <- type.convert(data_csp$`Part des ouvriers`, dec = ".")
-data_csp$Autres <- type.convert(data_csp$Autres, dec = ".")
+colnames(data_csp)[2] <- 'agriculteurs'
+colnames(data_csp)[3] <- 'artisans'
+colnames(data_csp)[4] <- 'cadres'
+colnames(data_csp)[5] <- 'prof_ind'
+colnames(data_csp)[6] <- 'employes'
+colnames(data_csp)[7] <- 'ouvriers'
+colnames(data_csp)[8] <- 'autres'
+data_csp <- data_csp[-1, ]
+data_csp$agriculteurs <- type.convert(data_csp$agriculteurs, dec = ".")
+data_csp$artisans <- type.convert(data_csp$artisans, dec = ".")
+data_csp$cadres <- type.convert(data_csp$cadres, dec = ".")
+data_csp$prof_ind <- type.convert(data_csp$prof_ind, dec = ".")
+data_csp$employes <- type.convert(data_csp$employes, dec = ".")
+data_csp$ouvriers <- type.convert(data_csp$ouvriers, dec = ".")
+data_csp$autres <- type.convert(data_csp$autres, dec = ".")
 
 # obese data manipulation
 data_obese <- data_obese[c(4:nrow(data_obese)),]
@@ -110,6 +114,16 @@ data_for_regression <- subset(data,
                                          pourcentage_40_59ans, pourcentage_60_74ans, pourcentage_75_etplus))
 #  SELECT THE DAY                                         
 data_for_regression <- subset(data_for_regression, data_for_regression$jour == "2020-04-15")
+
+data_hosp <- subset(data, select = c(dep, jour, hosp_pop))
+data_hosp$jour <- as.Date(data_hosp$jour)
+data_hosp <- subset(data_hosp, data_hosp$jour > as.Date("2020-04-01") & data_hosp$jour < as.Date("2020-04-15"))
+data_hosp<- reshape(data_hosp, direction = "wide", idvar = "dep", timevar = "jour")
+
+data_rea <- subset(data, select = c(dep, jour, rea_pop))
+data_rea$jour <- as.Date(data_rea$jour)
+data_rea <- subset(data_rea, data_rea$jour > as.Date("2020-04-01") & data_rea$jour < as.Date("2020-04-15"))
+data_rea<- reshape(data_rea, direction = "wide", idvar = "dep", timevar = "jour")
 
 # SELECT THE TEMPERATURE OF THE MONTH BEFORE  AND THE MONTH OF THE SELECTED DAY
 
@@ -136,12 +150,15 @@ data_for_regression <- left_join(data_for_regression, data_fisc, by = "dep")
 data_for_regression <- left_join(data_for_regression, data_obese, by = "dep")
 data_for_regression <- left_join(data_for_regression, data_csp, by = "dep")
 data_for_regression <- left_join(data_for_regression, data_temp_for_regression, by = "dep")
+data_for_regression <- left_join(data_for_regression, data_hosp, by = "dep")
+data_for_regression <- left_join(data_for_regression, data_rea, by = "dep")
 
 #Retrieve dep & jour columns
 data_for_regression <- subset(data_for_regression, select = -c(dep, jour))
 
 
 data_for_regression <- data_for_regression[!is.na(data_for_regression$`tmoy.avril-2020`),]
+data_for_regression[] <- lapply(data_for_regression, function(x) type.convert(as.numeric(x)))
 data_for_regression <- as.data.frame(scale(data_for_regression))
 
 ##############################################################################################################################################
@@ -150,12 +167,13 @@ data_for_regression <- as.data.frame(scale(data_for_regression))
 
 ##############################################################################################################################################
 
-modele <- lm(data_for_regression$hosp_pop ~., data = data_for_regression)
+col <- c("hosp_pop", "med_revenu", "frequence_obesite", "nbr_pop")
+modele <- lm(data_for_regression$hosp_pop ~., data = data_for_regression[, col])
 sm <- summary(modele)
 sm
 library(MASS)
 step <- stepAIC(modele, direction = "both", trace = FALSE)
-step
+
 
 
 ###############################################################################################################################################
@@ -167,8 +185,11 @@ step
 
 library(glmnet)
 
-x = as.matrix(subset(data_for_regression, select = -c(hosp_pop)))
-y_train = data_for_regression$hosp_pop
+x = as.matrix(data_for_regression)
+y_train = data_for_regression$rea_pop
+
+ridge2 <-  glmnet(x, y_train, alpha = 0, family = 'gaussian', standardize = FALSE)
+plot(ridge2, xvar = "lambda")
 
 # Cherche optimal lambdas
 lambdas <- 10^seq(2, -3, by = -.1)
@@ -179,8 +200,66 @@ optimal_lambda
 ridge_reg = glmnet(x, y_train, alpha = 0, family = 'gaussian', lambda = optimal_lambda)
 
 ridge_reg$beta
+x = summary(ridge_reg$beta)
+names = rownames(ridge_reg$beta)
+data_ridge = as.data.frame(x$x,names)
+colnames(data_ridge)[1] <- 'coef'
+data_ridge <- subset(data_ridge, abs(data_ridge$coef) > 0.01)
 
-# SELECT THE BEST MODEL --- SELECT BEST VARIABLES
-step_ridge <- stepAIC(ridge_reg, direction = "both", trace = FALSE)
+
+cv_lasso <- cv.glmnet(x, y_train, alpha = 1, lambda = lambdas)
+optimal_lambda_lasso <- cv_lasso$lambda.min
+optimal_lambda_lasso
+
+lasso_reg <- glmnet(x, y_train, alpha = 1, standardize = FALSE, lambda = optimal_lambda_lasso)
+lasso_reg$beta
+
+x_lasso = summary(lasso_reg$beta)
+#names_lasso = rownames(lasso_reg$beta)
+i = 1
+names_list_lasso = list()
+for (elt in x_lasso$i){
+  names_lasso[elt] -> names_list_lasso[i]
+  i = i + 1 
+}
+ 
+data_lasso = as.data.frame(x_lasso$x,unlist(names_list_lasso))
+colnames(data_lasso)[1] <- 'coef'
 
 
+###############################################################################################################################################
+
+##############################################################    PREDICTIONS   ###############################################################
+
+###############################################################################################################################################
+
+index = sample(1:nrow(data_for_regression), 0.7*nrow(data_for_regression))
+
+train = data_for_regression[index,] # Create the training data
+x_train <- as.matrix(train)
+y_train2 <- train$rea_pop
+
+test = data_for_regression[-index,] # Create the test data
+x_test <- as.matrix(test)
+y_test <- test$rea_pop
+
+ridge_reg_for_regression <- glmnet(x_train, y_train2, alpha = 0, family = 'gaussian', lambda = optimal_lambda)
+eval_results <- function(true, predicted, df) {
+  SSE <- sum((predicted - true)^2)
+  SST <- sum((true - mean(true))^2)
+  R_square <- 1 - SSE / SST
+  RMSE = sqrt(SSE/nrow(df))
+  # Model performance metrics
+  data.frame(
+    RMSE = RMSE,
+    Rsquare = R_square
+  )
+}
+
+# Prediction and evaluation on train data
+predictions_train <- predict(ridge_reg_for_regression, s = optimal_lambda, newx = x_train)
+eval_results(y_train2, predictions_train, train)
+
+# Prediction and evaluation on test data
+predictions_test <- predict(ridge_reg_for_regression, s = optimal_lambda, newx = x_test)
+eval_results(y_test, predictions_test, test)
