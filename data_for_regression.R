@@ -117,12 +117,15 @@ data_for_regression <- subset(data_for_regression, data_for_regression$jour == "
 
 data_hosp <- subset(data, select = c(dep, jour, hosp_pop))
 data_hosp$jour <- as.Date(data_hosp$jour)
-data_hosp <- subset(data_hosp, data_hosp$jour > as.Date("2020-04-01") & data_hosp$jour < as.Date("2020-04-15"))
+data_hosp <- subset(data_hosp, data_hosp$jour == as.Date("2020-04-08") | data_hosp$jour == as.Date("2020-04-05") | 
+                      data_hosp$jour == as.Date("2020-04-01")  | data_hosp$jour == as.Date("2020-03-27"))
+
 data_hosp<- reshape(data_hosp, direction = "wide", idvar = "dep", timevar = "jour")
 
 data_rea <- subset(data, select = c(dep, jour, rea_pop))
 data_rea$jour <- as.Date(data_rea$jour)
-data_rea <- subset(data_rea, data_rea$jour > as.Date("2020-04-01") & data_rea$jour < as.Date("2020-04-15"))
+data_rea <- subset(data_rea, data_rea$jour == as.Date("2020-04-08") | data_rea$jour == as.Date("2020-04-05") | 
+                     data_rea$jour == as.Date("2020-04-01")  | data_rea$jour == as.Date("2020-03-27"))
 data_rea<- reshape(data_rea, direction = "wide", idvar = "dep", timevar = "jour")
 
 # SELECT THE TEMPERATURE OF THE MONTH BEFORE  AND THE MONTH OF THE SELECTED DAY

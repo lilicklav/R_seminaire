@@ -1,6 +1,6 @@
 ---
 title: "Modele de régression et sélection de variables"
-subtitle: "Existe-til un lien entre facteurs climatiques et socio-économiques et l'évolution du nombre d'hospitalisations ?"
+subtitle: "Sujet 2 : Modèles de régression et sélection de variables : Existe-t-il un lien entre des facteurs climatiques (température, pluviométrie, ensoleillement, vent,… ) et socio-économiques (revenu fiscal, age, …) et l’évolution du nombre d’hospitalisations (ou réanimations) à l’échelle du département?"
 author: 
   - ALLEMANE Marjorie 
   - AMY Houssem 
@@ -34,21 +34,22 @@ Ensemble des membres : Récupération des sources de données externes
 
 # Présentation du sujet
 
-Sujet 2 : Modèles de régression et sélection de variables : Existe-t-il un lien entre des facteurs climatiques (température, pluviométrie, ensoleillement, vent,… ) et socio-économiques (revenu fiscal, age, …) et l’évolution du nombre d’hospitalisations (ou réanimations) à l’échelle du département?
-
-<br/>
 
 
-Ce rapport contient les résultats d'analyse de données
-d'hospitalisation et réanimation de la crise du covid sur le plan national et départemental.
+Ce rapport contient les résultats d'analyse de données d'hospitalisation et réanimation de la crise du covid sur le plan national et départemental.
 
 
 
-Pour entrer dans le vif du sujet,
-voici un graphique dynamique représentant le 
-nombre de réanimation pour chaque département.
+Pour entrer dans le vif du sujet, voici un graphique dynamique représentant le  nombre de réanimation pour chaque département.
 
-```{r data1, echo=FALSE, message=FALSE,warning=FALSE}
+```{r data1, echo=TRUE, message=FALSE,warning=FALSE}
+
+############################################################################################################################################
+
+####################################################   PREPARATION DES DONNEES #############################################################
+
+############################################################################################################################################
+
 library(dplyr)
 library(readxl)
 library(ggplot2)
@@ -168,12 +169,14 @@ data_for_regression <- subset(data_for_regression, data_for_regression$jour == "
 
 data_hosp <- subset(data_population, select = c(dep, jour, hosp_pop))
 data_hosp$jour <- as.Date(data_hosp$jour)
-data_hosp <- subset(data_hosp, data_hosp$jour > as.Date("2020-04-01") & data_hosp$jour < as.Date("2020-04-15"))
+data_hosp <- subset(data_hosp, data_hosp$jour == as.Date("2020-04-08") | data_hosp$jour == as.Date("2020-04-05") | 
+                      data_hosp$jour == as.Date("2020-04-01")  | data_hosp$jour == as.Date("2020-03-27"))
 data_hosp<- reshape(data_hosp, direction = "wide", idvar = "dep", timevar = "jour")
 
 data_rea <- subset(data_population, select = c(dep, jour, rea_pop))
 data_rea$jour <- as.Date(data_rea$jour)
-data_rea <- subset(data_rea, data_rea$jour > as.Date("2020-04-01") & data_rea$jour < as.Date("2020-04-15"))
+data_rea <- subset(data_rea, data_rea$jour == as.Date("2020-04-08") | data_rea$jour == as.Date("2020-04-05") | 
+                     data_rea$jour == as.Date("2020-04-01")  | data_rea$jour == as.Date("2020-03-27"))
 data_rea<- reshape(data_rea, direction = "wide", idvar = "dep", timevar = "jour")
 
 # SELECT THE TEMPERATURE OF THE MONTH BEFORE  AND THE MONTH OF THE SELECTED DAY
@@ -220,7 +223,19 @@ data_for_regression <- as.data.frame(scale(data_for_regression))
 ##############################################################################################################################################
 ```
 
-```{r graph, echo=FALSE,message=FALSE,warning=FALSE}
+
+# Présentation du sujet
+
+<br/>
+
+
+Ce rapport contient les résultats d'analyse de données d'hospitalisation et réanimation de la crise du covid sur le plan national et départemental.
+
+
+
+Pour entrer dans le vif du sujet, voici un graphique dynamique représentant le  nombre de réanimation pour chaque département.
+
+```{r graph, echo=TRUE,message=FALSE,warning=FALSE}
 library(ggplot2)
 library(plotly)
 library(scales)
@@ -249,7 +264,7 @@ L'objectif est de trouver s'il y a des liens entre ces variables et le nombre d'
 Pour cela nous avons d'abord étudié les corrélations de chaque variables avec les variables nombre d'hospitalisés et nombre de réanimation.
 
 #  Calcul des corrélations
-```{r correlation, echo=FALSE, message=FALSE,warning=FALSE}
+```{r correlation, echo=TRUE, message=FALSE,warning=FALSE}
 library(corrplot)
 
 data_agri <- data_for_regression[, c(1,2,9)]
@@ -329,8 +344,9 @@ Afin de confirmer (ou non) les corrélations trouvées nous allons maintenant fa
 ## Explication du nombre d'hospitalisation
 
 
-```{r regression, echo=FALSE, message=FALSE,warning=FALSE}
-modele_all <- lm(data_for_regression$hosp_pop ~., data = data_for_regression)
+```{r regression, echo=TRUE, message=FALSE,warning=FALSE}
+data_for_regression_lin_hosp <- subset(data_for_regression, select = -c(rea_pop))
+modele_all <- lm(data_for_regression_lin_hosp$hosp_pop ~., data = data_for_regression_lin_hosp)
 sm <- summary(modele_all)
 sm
 
@@ -383,23 +399,23 @@ Nous ajoutons à cela des valeurs plutot accceptables pour les variables : pourc
 ### Selection de modele pour l'explication du nombre d'hospitalisation 
 
 Nous utilisons un stepAIC qui va tester toutes les combinaisons de variables afin de sélectionner le meilleur modèle. On testera les résultats ensuite. 
-```{r step, echo=FALSE, message=FALSE,warning=FALSE}
+```{r step, echo=TRUE, message=FALSE,warning=FALSE}
 
 library(MASS)
 step <- stepAIC(modele_all, direction = "both", trace = FALSE)
 step
 
-modele_after_step <- lm(formula = data_for_regression$hosp_pop ~ rea_pop + nbr_pop + 
-     pourcentage_10_19ans + pourcentage_40_59ans + taux_pauvrete_moy + 
-     taux_pauvrete_30etmoins + taux_pauvrete_30_39ans + taux_pauvrete_50_59ans + 
-     taux_pauvrete_60_74ans + taux_pauvrete_75etplus + frequence_obesite + 
-     artisans + prof_ind + employes + ouvriers + `tmoy.avril-2020` + 
-     `tmoy.mars-2020` + `hosp_pop.2020-04-05` + `hosp_pop.2020-04-07` + 
-     `hosp_pop.2020-04-09` + `hosp_pop.2020-04-10` + `hosp_pop.2020-04-14` + 
-     `rea_pop.2020-04-04` + `rea_pop.2020-04-05` + `rea_pop.2020-04-12` + 
-     `rea_pop.2020-04-13` + `hosp_pop.2020-04-06`, data = data_for_regression)
-sm_step <- summary(modele_after_step)
-sm_step
+#modele_after_step <- lm(formula = data_for_regression$hosp_pop ~ rea_pop + nbr_pop + 
+#     pourcentage_10_19ans + pourcentage_40_59ans + taux_pauvrete_moy + 
+#     taux_pauvrete_30etmoins + taux_pauvrete_30_39ans + taux_pauvrete_50_59ans + 
+#     taux_pauvrete_60_74ans + taux_pauvrete_75etplus + frequence_obesite + 
+#     artisans + prof_ind + employes + ouvriers + `tmoy.avril-2020` + 
+#     `tmoy.mars-2020` + `hosp_pop.2020-04-05` + `hosp_pop.2020-04-07` + 
+#     `hosp_pop.2020-04-09` + `hosp_pop.2020-04-10` + `hosp_pop.2020-04-14` + 
+# `rea_pop.2020-04-04` + `rea_pop.2020-04-05` + `rea_pop.2020-04-12` + 
+#     `rea_pop.2020-04-13` + `hosp_pop.2020-04-06`, data = data_for_regression)
+#sm_step <- summary(modele_after_step)
+#sm_step
 
 ```
 On remarque donc effectivement que ce modèle fonctionne très bien avec un R-squared très proche voire supérieur au modele contenant toutes les variables.<br/>
@@ -408,26 +424,29 @@ On peut donc en déduire une sélection de nos variables pour l'explication du n
 
 ## Explication du nombre de réanimations
 
-```{r modelelinrea, echo=FALSE, message=FALSE,warning=FALSE}
-modele_rea <- lm(data_for_regression$rea_pop ~., data = data_for_regression)
+```{r modelelinrea, echo=TRUE, message=FALSE,warning=FALSE}
+data_for_regression_lin_rea <- subset(data_for_regression, select = -c(hosp_pop))
+modele_rea <- lm(data_for_regression_lin_rea$rea_pop ~., data = data_for_regression_lin_rea)
 sm_rea <- summary(modele_rea)
 sm_rea
 
-step_rea <- stepAIC(modele_rea, direction = "both", trace = FALSE)
+
 ```
 
 ### Selection de modele pour l'explication du nombre de réanimations
 
-```{r steprea, echo=FALSE, message=FALSE,warning=FALSE}
-modele_after_step_rea <- lm(formula = data_for_regression$rea_pop ~ hosp_pop + pourcentage_10_19ans + 
-     taux_pauvrete_moy + taux_pauvrete_30etmoins + taux_pauvrete_60_74ans + 
-    employes + ouvriers + `hosp_pop.2020-04-03` + `hosp_pop.2020-04-07` + 
-     `hosp_pop.2020-04-08` + `hosp_pop.2020-04-12` + `hosp_pop.2020-04-14` + 
-     `rea_pop.2020-04-02` + `rea_pop.2020-04-03` + `rea_pop.2020-04-06` + 
-    `rea_pop.2020-04-10` + `rea_pop.2020-04-14` + `hosp_pop.2020-04-13` + 
-    autres, data = data_for_regression)
-sm_step_rea <- summary(modele_after_step_rea)
-sm_step_rea
+```{r steprea, echo=TRUE, message=FALSE,warning=FALSE}
+step_rea <- stepAIC(modele_rea, direction = "both", trace = FALSE)
+step_rea
+#modele_after_step_rea <- lm(formula = data_for_regression$rea_pop ~ hosp_pop + pourcentage_10_19ans + 
+#     taux_pauvrete_moy + taux_pauvrete_30etmoins + taux_pauvrete_60_74ans + 
+#    employes + ouvriers + `hosp_pop.2020-04-03` + `hosp_pop.2020-04-07` + 
+#     `hosp_pop.2020-04-08` + `hosp_pop.2020-04-12` + `hosp_pop.2020-04-14` + 
+#     `rea_pop.2020-04-02` + `rea_pop.2020-04-03` + `rea_pop.2020-04-06` + 
+#    `rea_pop.2020-04-10` + `rea_pop.2020-04-14` + `hosp_pop.2020-04-13` + 
+#    autres, data = data_for_regression)
+#sm_step_rea <- summary(modele_after_step_rea)
+#sm_step_rea
 ```
 On remarque donc effectivement que ce modèle aussi fonctionne très bien avec un R-squared très proche voire supérieur au modele contenant toutes les variables.<br/> 
 
@@ -438,10 +457,10 @@ Nous utilisons maintenant à la ridge regression. <br/>
 ## Explications du taux d'hospitalisations 
 
 On commence d'abord par observer les coefficients de nos variables en fonction des log lambdas: 
-```{r ridgehosp, echo=FALSE, message=FALSE,warning=FALSE}
+```{r ridgehosp, echo=TRUE, message=FALSE,warning=FALSE}
 library(glmnet)
 
-x_hosp = as.matrix(subset(data_for_regression, select = -c(hosp_pop)))
+x_hosp = as.matrix(subset(data_for_regression, select = -c(hosp_pop, rea_pop)))
 y_train_hosp = data_for_regression$hosp_pop
 
 lambdas <- 10^seq(2, -3, by = -.1)
@@ -451,7 +470,7 @@ plot(ridge2, xvar = "lambda")
 
 On selectionne maintenant le lambda optimal:
 
-```{r lambdaopthosp, echo=FALSE, message=FALSE,warning=FALSE}
+```{r lambdaopthosp, echo=TRUE, message=FALSE,warning=FALSE}
 
 # Cherche optimal lambdas
 
@@ -462,7 +481,7 @@ optimal_lambda_hosp
 
 On observe les coefficients de chaque variable avec ce lambda. <br/> Plus un coefficient est éloignée de 0 et plus il a un impact sur le modèle. 
 
-```{r ridgereghosp, echo=FALSE, message=FALSE,warning=FALSE}
+```{r ridgereghosp, echo=TRUE, message=FALSE,warning=FALSE}
 ridge_reg_hosp = glmnet(x_hosp, y_train_hosp, alpha = 0, family = 'gaussian', lambda = optimal_lambda_hosp)
 
 ridge_reg_hosp$beta
@@ -470,16 +489,16 @@ ridge_reg_hosp$beta
 
 ###  Prediction du nombre d'hospitalisations du 15/04
 
-```{r predictionhosp, echo=FALSE, message=FALSE,warning=FALSE}
+```{r predictionhosp, echo=TRUE, message=FALSE,warning=FALSE}
 
 index = sample(1:nrow(data_for_regression), 0.7*nrow(data_for_regression))
 
 train = data_for_regression[index,] # Create the training data
-x_train_hosp <- as.matrix(subset(train, select = -c(hosp_pop)))
+x_train_hosp <- as.matrix(subset(train, select = -c(hosp_pop, rea_pop)))
 y_train_pred_hosp <- train$hosp_pop
 
 test = data_for_regression[-index,] # Create the test data
-x_test_hosp <- as.matrix(subset(test, select = -c(hosp_pop)))
+x_test_hosp <- as.matrix(subset(test, select = -c(hosp_pop, rea_pop)))
 y_test_hosp <- test$hosp_pop
 
 ridge_reg_hosp_pred <- glmnet(x_train_hosp, y_train_pred_hosp, alpha = 0, family = 'gaussian', lambda = optimal_lambda_hosp)
@@ -497,7 +516,7 @@ eval_results <- function(true, predicted, df) {
 }
 ```
 Prediction Train :
-```{r predictionTrainhosp, echo=FALSE, message=FALSE,warning=FALSE}
+```{r predictionTrainhosp, echo=TRUE, message=FALSE,warning=FALSE}
 
 # Prediction and evaluation on train data
 predictions_train_hosp <- predict(ridge_reg_hosp_pred, s = optimal_lambda_hosp, newx = x_train_hosp)
@@ -505,7 +524,7 @@ results_hosp_ridge_train <- eval_results(y_train_pred_hosp, predictions_train_ho
 results_hosp_ridge_train
 ```
 Prediction Test :
-```{r predictionTesthosp, echo=FALSE, message=FALSE,warning=FALSE}
+```{r predictionTesthosp, echo=TRUE, message=FALSE,warning=FALSE}
 
 # Prediction and evaluation on test data
 predictions_test_hosp <- predict(ridge_reg_hosp_pred, s = optimal_lambda_hosp, newx = x_test_hosp)
@@ -519,11 +538,11 @@ On arrive donc à prédire le pic d'hospitalisation du premier confinement par l
 
 On commence d'abord par observer les coefficients de nos variables en fonction des log lambdas: 
 
-```{r ridgeregression, echo=FALSE, message=FALSE,warning=FALSE}
+```{r ridgeregression, echo=TRUE, message=FALSE,warning=FALSE}
 
 library(glmnet)
 
-x = as.matrix(subset(data_for_regression, select = -c(rea_pop)))
+x = as.matrix(subset(data_for_regression, select = -c(rea_pop, hosp_pop)))
 y_train = data_for_regression$rea_pop
 
 lambdas <- 10^seq(2, -3, by = -.1)
@@ -533,7 +552,7 @@ plot(ridge_rea, xvar = "lambda")
 
 On selectionne maintenant le lambda optimal:
 
-```{r lambdaopt, echo=FALSE, message=FALSE,warning=FALSE}
+```{r lambdaopt, echo=TRUE, message=FALSE,warning=FALSE}
 
 # Cherche optimal lambdas
 
@@ -545,7 +564,7 @@ optimal_lambda
 On obtient un lambda optimal. On peut l'observer sur le graphique avec log(0.001) = -3.<br/>
 Les coefficients de chaque variable sont étudiés avec ce lambda. <br/> Plus un coefficient est éloignée de 0 et plus il a un impact sur le modèle. 
 
-```{r ridgereg, echo=FALSE, message=FALSE,warning=FALSE}
+```{r ridgereg, echo=TRUE, message=FALSE,warning=FALSE}
 ridge_reg = glmnet(x, y_train, alpha = 0, family = 'gaussian', lambda = optimal_lambda)
 
 ridge_reg$beta
@@ -553,12 +572,12 @@ ridge_reg$beta
 
 ###  Prediction du nombre de reanimations du 15/04
 
-```{r predictionrea, echo=FALSE, message=FALSE,warning=FALSE}
+```{r predictionrea, echo=TRUE, message=FALSE,warning=FALSE}
 
-x_train_rea <- as.matrix(subset(train, select = -c(rea_pop)))
+x_train_rea <- as.matrix(subset(train, select = -c(rea_pop, hosp_pop)))
 y_train_pred_rea <- train$rea_pop
 
-x_test_rea <- as.matrix(subset(test, select = -c(rea_pop)))
+x_test_rea <- as.matrix(subset(test, select = -c(rea_pop, hosp_pop)))
 y_test_rea <- test$rea_pop
 
 
@@ -579,7 +598,7 @@ eval_results <- function(true, predicted, df) {
 
 Prediction Train :
 
-```{r predictionTrainrea, echo=FALSE, message=FALSE,warning=FALSE}
+```{r predictionTrainrea, echo=TRUE, message=FALSE,warning=FALSE}
 
 # Prediction and evaluation on train data
 predictions_train_rea <- predict(ridge_reg_rea_pred, s = optimal_lambda, newx = x_train_rea)
@@ -589,7 +608,7 @@ results_rea_ridge_train
 
 Prediction Test :
 
-```{r predictionTestrea, echo=FALSE, message=FALSE,warning=FALSE}
+```{r predictionTestrea, echo=TRUE, message=FALSE,warning=FALSE}
 
 # Prediction and evaluation on test data
 predictions_test_rea <- predict(ridge_reg_rea_pred, s = optimal_lambda, newx = x_test_rea)
@@ -603,7 +622,7 @@ results_rea_ridge_test
 
 Nous affichons le lambda optimal pour cette regression et nous observons les coefficients associés aux variables:
 
-```{r regressionlassohosp, echo=FALSE, message=FALSE,warning=FALSE}
+```{r regressionlassohosp, echo=TRUE, message=FALSE,warning=FALSE}
 
 cv_lasso_hosp <- cv.glmnet(x_hosp, y_train_hosp, alpha = 1, lambda = lambdas)
 optimal_lambda_lasso_hosp <- cv_lasso_hosp$lambda.min
@@ -615,7 +634,7 @@ lasso_reg$beta
 
 ###  Prediction du nombre d'hospitalisation du pic du 15/04
 
-```{r predictionlassohosp, echo=FALSE, message=FALSE,warning=FALSE}
+```{r predictionlassohosp, echo=TRUE, message=FALSE,warning=FALSE}
 
 lasso_reg_hosp_pred <- glmnet(x_train_hosp, y_train_pred_hosp, alpha = 1, standardize = FALSE, lambda = optimal_lambda_lasso_hosp)
 
@@ -633,7 +652,7 @@ eval_results <- function(true, predicted, df) {
 
 ```
 Prediction Train :
-```{r predictionlassoTrainhosp, echo=FALSE, message=FALSE,warning=FALSE}
+```{r predictionlassoTrainhosp, echo=TRUE, message=FALSE,warning=FALSE}
 
 # Prediction and evaluation on train data
 predictions_lasso_hosp <- predict(lasso_reg_hosp_pred, s = optimal_lambda_lasso_hosp, newx = x_train_hosp)
@@ -641,7 +660,7 @@ results_hosp_lasso_train <- eval_results(y_train_pred_hosp, predictions_lasso_ho
 results_hosp_lasso_train
 ```
 Prediction Test :
-```{r predictionlassoTesthosp, echo=FALSE, message=FALSE,warning=FALSE}
+```{r predictionlassoTesthosp, echo=TRUE, message=FALSE,warning=FALSE}
 
 # Prediction and evaluation on test data
 predictions_test_lasso_hosp <- predict(lasso_reg_hosp_pred, s = optimal_lambda_lasso_hosp, newx = x_test_hosp)
@@ -653,7 +672,7 @@ results_hosp_lasso_test
 
 Nous affichons le lambda optimal pour cette regression et nous observons les coefficients associés aux variables:
 
-```{r regressionlassorea, echo=FALSE, message=FALSE,warning=FALSE}
+```{r regressionlassorea, echo=TRUE, message=FALSE,warning=FALSE}
 
 cv_lasso_rea <- cv.glmnet(x_hosp, y_train, alpha = 1, lambda = lambdas)
 optimal_lambda_lasso_rea <- cv_lasso_rea$lambda.min
@@ -665,7 +684,7 @@ lasso_reg_rea$beta
 
 ###  Prediction du nombre de reanimations du pic du 15/04
 
-```{r predictionlassorea, echo=FALSE, message=FALSE,warning=FALSE}
+```{r predictionlassorea, echo=TRUE, message=FALSE,warning=FALSE}
 
 lasso_reg_rea_pred <- glmnet(x_train_rea, y_train_pred_rea, alpha = 1, standardize = FALSE, lambda = optimal_lambda_lasso_rea)
 
@@ -682,7 +701,7 @@ eval_results <- function(true, predicted, df) {
 }
 ```
 Prediction Train :
-```{r predictionlassoTrainrea, echo=FALSE, message=FALSE,warning=FALSE}
+```{r predictionlassoTrainrea, echo=TRUE, message=FALSE,warning=FALSE}
 
 # Prediction and evaluation on train data
 predictions_lasso_rea <- predict(lasso_reg_rea_pred, s = optimal_lambda_lasso_rea, newx = x_train_rea)
@@ -690,7 +709,7 @@ results_rea_lasso_train <- eval_results(y_train_pred_rea, predictions_lasso_rea,
 results_rea_lasso_train
 ```
 Prediction Test :
-```{r predictionlassoTestrea, echo=FALSE, message=FALSE,warning=FALSE}
+```{r predictionlassoTestrea, echo=TRUE, message=FALSE,warning=FALSE}
 
 # Prediction and evaluation on test data
 predictions_test_lasso_rea <- predict(lasso_reg_rea_pred, s = optimal_lambda_lasso_rea, newx = x_test_rea)
@@ -702,7 +721,7 @@ results_rea_lasso_test
 
 ## Explication du Nombre d'hospitalisation 
 
-```{r chunckelasticNet, echo=FALSE, message=FALSE,warning=FALSE}
+```{r chunckelasticNet, echo=TRUE, message=FALSE,warning=FALSE}
 library(tidyverse)
 library(caret)
 library(glmnet)
@@ -715,7 +734,7 @@ coef(elastic$finalModel, elastic$bestTune$lambda)
 
 ###  Prediction du nombre d'hospitalisation du pic du 15/04
 
-```{r chunckelasticNetpredict, echo=FALSE, message=FALSE,warning=FALSE}
+```{r chunckelasticNetpredict, echo=TRUE, message=FALSE,warning=FALSE}
 predictions_train_elasc <- predict(elastic, x_train_hosp)
 results_hosp_elastic_train <- eval_results(y_train_pred_hosp, predictions_train_elasc, train) 
 results_hosp_elastic_train
@@ -727,7 +746,7 @@ results_hosp_elastic_test
 
 ## Explication du Nombre de réanimations 
 
-```{r elasticNetrea, echo=FALSE, message=FALSE,warning=FALSE}
+```{r elasticNetrea, echo=TRUE, message=FALSE,warning=FALSE}
 
 elastic_rea <- train(x_train_rea, y_train_pred_rea, method = "glmnet",trControl = trainControl("cv", number = 10),tuneLength = 10)
 
@@ -737,7 +756,7 @@ coef(elastic_rea$finalModel, elastic_rea$bestTune$lambda)
 
 ###  Prediction du nombre de reanimations du pic du 15/04
 
-```{r elasticNetreapredict, echo=FALSE, message=FALSE,warning=FALSE}
+```{r elasticNetreapredict, echo=TRUE, message=FALSE,warning=FALSE}
 predictions_train_elasc_rea <- predict(elastic_rea, x_train_rea)
 results_hosp_elastic_train_rea <- eval_results(y_train_pred_rea, predictions_train_elasc_rea, train) 
 results_hosp_elastic_train_rea
@@ -753,7 +772,7 @@ results_hosp_elastic_test_rea
 
 Avant de conclure sur la selection de variables explicatives, on remarque d'abord que les modèles que nous avons effectuées ont bien fonctionnés. Ce qui signifie que nos variables expliquent bien le nombre d'hospitalisations.
 
-```{r conclusionresulthosp, echo=FALSE, message=FALSE,warning=FALSE}
+```{r conclusionresulthosp, echo=TRUE, message=FALSE,warning=FALSE}
 
 results_rmse_train <- c(results_hosp_ridge_train$RMSE, results_hosp_lasso_train$RMSE, results_lm_hosp_train$RMSE, results_hosp_elastic_train$RMSE)
 results_rmse_test <- c(results_hosp_ridge_test$RMSE, results_hosp_lasso_test$RMSE, results_lm_hosp_test$RMSE, results_hosp_elastic_test$RMSE)
@@ -772,7 +791,7 @@ result
 La régression ridge nous permet d'estimer les coefficients de la regression linéaire en prenant pour Y le nombre d'hospitalisation du pic du covid en avril 2020. Nous rappelons que plus un coefficient est faible et moins il est utile dans notre prédiction.<br/>
 C'est pourquoi nous avons décider de sélectionner les variables dont le coefficient est supérieur à 0.01.
 
-```{r conclusionselectionhospridge, echo=FALSE, message=FALSE,warning=FALSE}
+```{r conclusionselectionhospridge, echo=TRUE, message=FALSE,warning=FALSE}
 
 summary_ridge_hosp = summary(ridge_reg_hosp$beta)
 names_ridge_hosp = rownames(ridge_reg_hosp$beta)
@@ -785,7 +804,7 @@ data_ridge_hosp
 ### Selection de variables avec la méthode Lasso regression
 
 
-```{r conclusionselectionhosplasso, echo=FALSE, message=FALSE,warning=FALSE}
+```{r conclusionselectionhosplasso, echo=TRUE, message=FALSE,warning=FALSE}
 
 summary_lasso_hosp = summary(lasso_reg$beta)
 names_lasso = rownames(lasso_reg$beta)
@@ -805,7 +824,7 @@ data_lasso_hosp
 
 ### Selection de variables avec la méthode Elastic Net
 
-```{r conclusionselectionhospelastic, echo=FALSE, message=FALSE,warning=FALSE}
+```{r conclusionselectionhospelastic, echo=TRUE, message=FALSE,warning=FALSE}
 
 summary_elastic <- summary(coef(elastic$finalModel, elastic$bestTune$lambda))
 names_elastic <- rownames(coef(elastic$finalModel, elastic$bestTune$lambda))
@@ -827,7 +846,7 @@ data_elastic_hosp
 
 De même pour la réanimation du pic du covid, les modèles que nous avons effectués ont bien fonctionnés. Ce qui signifie que nos variables expliquent bien le nombre de reanimations. 
 
-```{r conclusionresultrea, echo=FALSE, message=FALSE,warning=FALSE}
+```{r conclusionresultrea, echo=TRUE, message=FALSE,warning=FALSE}
 results_rmse_train_rea <- c(results_rea_ridge_train$RMSE, results_rea_lasso_train$RMSE, results_lm_rea_train$RMSE, results_hosp_elastic_train_rea$RMSE)
 results_rmse_test_rea <- c(results_rea_ridge_test$RMSE, results_rea_lasso_test$RMSE, results_lm_rea_test$RMSE, results_hosp_elastic_test_rea$RMSE)
 results_rsquare_train_rea <- c(results_rea_ridge_train$Rsquare, results_rea_lasso_train$Rsquare, results_lm_rea_train$Rsquare, results_hosp_elastic_train_rea$Rsquare)
@@ -846,7 +865,7 @@ result_rea
 La régression ridge nous permet d'estimer les coefficients de la regression linéaire en prenant pour Y le nombre de réanimations du pic du covid en avril 2020. Nous rappelons que plus un coefficient est faible et moins il est utile dans notre prédiction.<br/>
 C'est pourquoi nous avons décider de sélectionner les variables dont le coefficient est supérieur à 0.05.
 
-```{r conclusionselectionrearidge, echo=FALSE, message=FALSE,warning=FALSE}
+```{r conclusionselectionrearidge, echo=TRUE, message=FALSE,warning=FALSE}
 
 summary_ridge_rea = summary(ridge_reg$beta)
 names_ridge_rea = rownames(ridge_reg$beta)
@@ -860,7 +879,7 @@ data_ridge_rea
 
 
 
-```{r conclusionselectionrealasso, echo=FALSE, message=FALSE,warning=FALSE}
+```{r conclusionselectionrealasso, echo=TRUE, message=FALSE,warning=FALSE}
 
 summary_lasso_rea = summary(lasso_reg_rea$beta)
 names_lasso = rownames(lasso_reg_rea$beta)
@@ -880,7 +899,7 @@ data_lasso_rea
 
 ### Selection de variables avec la méthode Elastic Net
 
-```{r conclusionselectionreaelastic, echo=FALSE, message=FALSE,warning=FALSE}
+```{r conclusionselectionreaelastic, echo=TRUE, message=FALSE,warning=FALSE}
 
 summary_elastic <- summary(coef(elastic_rea$finalModel, elastic_rea$bestTune$lambda))
 names_elastic <- rownames(coef(elastic_rea$finalModel, elastic_rea$bestTune$lambda))
